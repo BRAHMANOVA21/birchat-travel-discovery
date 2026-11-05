@@ -10,7 +10,7 @@ const GEMINI_BASE_URL = () =>
     /\/+$/,
     "",
   );
-const GEMINI_MODEL_NAME = () => env("GEMINI_MODEL_NAME", "gemini-3.8-flash");
+const GEMINI_MODEL_NAME = () => env("GEMINI_MODEL_NAME", "gemini-2.5-flash");
 const GEMINI_API_KEY = () => env("GEMINI_API_KEY");
 
 const LANG_NAME = { az: "Azerbaijani", ru: "Russian", en: "English" } as const;
