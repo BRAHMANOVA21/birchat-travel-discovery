@@ -1,4 +1,4 @@
-// Text-to-speech for assistant replies. Gemini 3.8 TTS via the native generateContent endpoint
+// Text-to-speech for assistant replies. Gemini 2.5 Flash TTS via the native generateContent endpoint
 // (TTS is not on the OpenAI-compatible endpoint); the key stays on the server, same GEMINI_API_KEY as STT.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -11,7 +11,7 @@ const GEMINI_NATIVE_BASE_URL = () =>
     /\/+$/,
     "",
   );
-const GEMINI_TTS_MODEL_NAME = () => env("GEMINI_TTS_MODEL_NAME", "gemini-3.8-flash-tts");
+const GEMINI_TTS_MODEL_NAME = () => env("GEMINI_TTS_MODEL_NAME", "gemini-2.5-flash-preview-tts");
 const GEMINI_TTS_VOICE = () => env("GEMINI_TTS_VOICE", "Kore");
 const GEMINI_API_KEY = () => env("GEMINI_API_KEY");
 // Text model that turns the reply + result cards into a short spoken summary (same endpoint as STT).
@@ -21,10 +21,16 @@ const GEMINI_BASE_URL = () =>
     "",
   );
 const GEMINI_SUMMARY_MODEL_NAME = () =>
-  env("GEMINI_SUMMARY_MODEL_NAME") || env("GEMINI_MODEL_NAME", "gemini-3.8-flash");
+  env("GEMINI_SUMMARY_MODEL_NAME") || env("GEMINI_MODEL_NAME", "gemini-2.5-flash");
 
-// Turn-level delivery goes in speech_metadata.style; Gemini 3.8 TTS reads `text` verbatim.
+// 2.5 Flash TTS has no speech_metadata field: delivery goes in as a spoken instruction the model
+// follows (it is not read aloud). Set GEMINI_TTS_STYLE= to send the reply text with no instruction.
 const TTS_STYLE = () => env("GEMINI_TTS_STYLE", "warm, friendly and natural, conversational pace");
+
+const withStyle = (text: string) => {
+  const style = TTS_STYLE().trim();
+  return style ? `Say this in a ${style} voice:\n${text}` : text;
+};
 
 const MAX_TEXT = 5000;
 
@@ -127,7 +133,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function toSpeakable(text: string): string {
   return text
     .replace(/https?:\/\/\S+/g, "")
-    .replace(/[<>]/g, " ") // Gemini 3.8 TTS treats <...> as vocal tags
+    .replace(/[<>]/g, " ") // TTS treats <...> as vocal tags
     .replace(/[*_#`~|]+/g, "")
     .replace(/\s+\n/g, "\n")
     .replace(/[ \t]{2,}/g, " ")
@@ -173,13 +179,13 @@ async function textToSpeechWithRetry(
             contents: [
               {
                 role: "user",
-                parts: [{ text, speech_metadata: { style: TTS_STYLE() } }],
-              },
-            ],
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: { voiceConfig: { voice: GEMINI_TTS_VOICE() } },
-            },
+            parts: [{ text: withStyle(text) }],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: GEMINI_TTS_VOICE() } } },
+        },
           }),
           signal: AbortSignal.timeout(60_000),
         },
